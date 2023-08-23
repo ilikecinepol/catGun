@@ -10,6 +10,7 @@ const int xStepPin = 5;
 const int xDirPin = 4;
 const int yStepPin = 2;
 const int yDirPin = 0;
+const int ledPin = 13;
 
 // Пины для сервомотора
 const int servoPin = 14;
@@ -68,6 +69,13 @@ void loop() {
     int newAngle = request.substring(request.indexOf("angle=") + 6).toInt();
     rotateZ(newAngle);
   }
+  } else if (request.indexOf("/z") != -1) {
+    // ... (остальной код)
+  } else if (request.indexOf("/ledon") != -1) {
+    digitalWrite(ledPin, HIGH);
+  } else if (request.indexOf("/ledoff") != -1) {
+    digitalWrite(ledPin, LOW);
+  }
 
   // Отправка HTTP-ответа
   client.println("HTTP/1.1 200 OK");
@@ -93,6 +101,21 @@ void loop() {
   client.println("  xhr.open('GET', '/z?angle=' + value, true);");
   client.println("  xhr.send();");
   client.println("}");
+  client.println("<h2>Управление светодиодом</h2>");
+  client.println("<button onclick='turnOnLED()'>Включить светодиод</button>");
+  client.println("<button onclick='turnOffLED()'>Выключить светодиод</button>");
+  client.println("<script>");
+  client.println("function turnOnLED() {");
+  client.println("  var xhr = new XMLHttpRequest();");
+  client.println("  xhr.open('GET', '/ledon', true);");
+  client.println("  xhr.send();");
+  client.println("}");
+  client.println("function turnOffLED() {");
+  client.println("  var xhr = new XMLHttpRequest();");
+  client.println("  xhr.open('GET', '/ledoff', true);");
+  client.println("  xhr.send();");
+  client.println("}");
+  client.println("</script>");
   client.println("</script>");
   client.println("</body></html>");
 
@@ -102,10 +125,24 @@ void loop() {
 
 // Функция для управления шаговым двигателем X
 void moveX(int newPos) {
-  // Ваш код для управления шаговым двигателем X
+  int stepsToMove = newPos - xPosition;
+  int dir = (stepsToMove > 0) ? HIGH : LOW;
+  stepsToMove = abs(stepsToMove);
+
+  digitalWrite(xDirPin, dir);
+  for (int i = 0; i < stepsToMove; i++) {
+    digitalWrite(xStepPin, HIGH);
+    delayMicroseconds(500);
+    digitalWrite(xStepPin, LOW);
+    delayMicroseconds(500);
+  }
+
+  xPosition = newPos;
 }
 
 // Функция для управления сервомотором Z
 void rotateZ(int newAngle) {
-  // Ваш код для управления сервомотором Z
+  newAngle = constrain(newAngle, 0, 180);
+  servoZ.write(newAngle);
+  zAngle = newAngle;
 }
