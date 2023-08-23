@@ -2,18 +2,18 @@
 #include <Servo.h>
 
 // Укажите настройки Wi-Fi
-const char* ssid = "Ваш_SSID";
-const char* password = "Ваш_пароль";
+const char* ssid = "Robot";
+const char* password = "93qp799qP";
 
 // Пины для шаговых двигателей
-const int xStepPin = 5;
-const int xDirPin = 4;
-const int yStepPin = 2;
-const int yDirPin = 0;
-const int ledPin = 13;
+const int xStepPin = 16;
+const int xDirPin = 14;
+const int yStepPin = 4;
+const int yDirPin = 12;
+const int ledPin = 5;
 
 // Пины для сервомотора
-const int servoPin = 14;
+const int servoPin = 5;
 
 // Создаем объекты Servo
 Servo servoZ;
@@ -53,6 +53,30 @@ void setup() {
   Serial.println("Server started");
 }
 
+// Функция для управления шаговым двигателем X
+void moveX(int newPos) {
+  int stepsToMove = newPos - xPosition;
+  int dir = (stepsToMove > 0) ? HIGH : LOW;
+  stepsToMove = abs(stepsToMove);
+
+  digitalWrite(xDirPin, dir);
+  for (int i = 0; i < stepsToMove; i++) {
+    digitalWrite(xStepPin, HIGH);
+    delayMicroseconds(500);
+    digitalWrite(xStepPin, LOW);
+    delayMicroseconds(500);
+  }
+
+  xPosition = newPos;
+}
+
+// Функция для управления сервомотором Z
+void rotateZ(int newAngle) {
+  newAngle = constrain(newAngle, 0, 180);
+  servoZ.write(newAngle);
+  zAngle = newAngle;
+}
+
 void loop() {
   // Ожидание клиента
   WiFiClient client = server.available();
@@ -68,9 +92,7 @@ void loop() {
   } else if (request.indexOf("/z") != -1) {
     int newAngle = request.substring(request.indexOf("angle=") + 6).toInt();
     rotateZ(newAngle);
-  }
-  } else if (request.indexOf("/z") != -1) {
-    // ... (остальной код)
+  
   } else if (request.indexOf("/ledon") != -1) {
     digitalWrite(ledPin, HIGH);
   } else if (request.indexOf("/ledoff") != -1) {
@@ -123,26 +145,5 @@ void loop() {
   client.stop();
 }
 
-// Функция для управления шаговым двигателем X
-void moveX(int newPos) {
-  int stepsToMove = newPos - xPosition;
-  int dir = (stepsToMove > 0) ? HIGH : LOW;
-  stepsToMove = abs(stepsToMove);
 
-  digitalWrite(xDirPin, dir);
-  for (int i = 0; i < stepsToMove; i++) {
-    digitalWrite(xStepPin, HIGH);
-    delayMicroseconds(500);
-    digitalWrite(xStepPin, LOW);
-    delayMicroseconds(500);
-  }
 
-  xPosition = newPos;
-}
-
-// Функция для управления сервомотором Z
-void rotateZ(int newAngle) {
-  newAngle = constrain(newAngle, 0, 180);
-  servoZ.write(newAngle);
-  zAngle = newAngle;
-}
