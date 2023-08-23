@@ -21,31 +21,8 @@ Servo servoZ;
 int xPosition = 0;
 int zAngle = 90;
 
-// Функция для настройки шаговых двигателей (подставьте свои значения)
-void setupSteppers() {
-  // Настройка пинов
-  pinMode(xStepPin, OUTPUT);
-  pinMode(xDirPin, OUTPUT);
-  pinMode(yStepPin, OUTPUT);
-  pinMode(yDirPin, OUTPUT);
-}
-
-// Функция для управления шаговым двигателем X
-void moveX(int steps, int dir) {
-  digitalWrite(xDirPin, dir);
-  for (int i = 0; i < steps; i++) {
-    digitalWrite(xStepPin, HIGH);
-    delayMicroseconds(500);
-    digitalWrite(xStepPin, LOW);
-    delayMicroseconds(500);
-  }
-}
-
-// Функция для управления сервомотором Z
-void rotateZ(int angle) {
-  angle = constrain(angle, 0, 180);
-  servoZ.write(angle);
-}
+// Создаем сервер на порту 80
+WiFiServer server(80);
 
 void setup() {
   // Инициализация Serial
@@ -60,24 +37,39 @@ void setup() {
   Serial.println("Connected to WiFi");
 
   // Настройка шаговых двигателей
-  setupSteppers();
+  pinMode(xStepPin, OUTPUT);
+  pinMode(xDirPin, OUTPUT);
+  pinMode(yStepPin, OUTPUT);
+  pinMode(yDirPin, OUTPUT);
 
   // Подключение сервомотора
   servoZ.attach(servoPin);
   servoZ.write(zAngle);
 
-  // Запуск сервера
+  // Начало прослушивания порта
+  server.begin();
+
   Serial.println("Server started");
 }
 
 void loop() {
-  // Ждем подключения клиента
+  // Ожидание клиента
   WiFiClient client = server.available();
   if (!client) {
     return;
   }
 
-  // Отправляем HTML-страницу клиенту
+  // Обработка запросов клиента
+  String request = client.readStringUntil('\r');
+  if (request.indexOf("/x") != -1) {
+    int newPos = request.substring(request.indexOf("pos=") + 4).toInt();
+    moveX(newPos);
+  } else if (request.indexOf("/z") != -1) {
+    int newAngle = request.substring(request.indexOf("angle=") + 6).toInt();
+    rotateZ(newAngle);
+  }
+
+  // Отправка HTTP-ответа
   client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: text/html");
   client.println();
@@ -103,4 +95,25 @@ void loop() {
   client.println("}");
   client.println("</script>");
   client.println("</body></html>");
+
+  delay(10);
+  client.stop();
+}
+
+// Функция для управления шаговым двигателем X
+void moveX(int newPos) {
+  digitalWrite(xDirPin, 0); // set direction, HIGH for clockwise, LOW for anticlockwise
+ 
+ while(digitalRead(13) == HIGH) { 
+  digitalWrite(xStepPin,HIGH);
+  delayMicroseconds(1000);
+  digitalWrite(xStepPin,LOW); 
+  delayMicroseconds(1000);
+ }
+delay(100); // delay for 1 second
+}
+
+// Функция для управления сервомотором Z
+void rotateZ(int newAngle) {
+  // Ваш код для управления сервомотором Z
 }
