@@ -18,6 +18,9 @@ char pass[] = "93qp799qP";
 // Укажите пин для сервомотора
 #define SERVO_PIN 5
 
+// Создаем объекты шаговых двигателей
+AccelStepper stepperX(AccelStepper::DRIVER, X_STEP_PIN, X_DIR_PIN);
+AccelStepper stepperY(AccelStepper::DRIVER, Y_STEP_PIN, Y_DIR_PIN);
 
 // Создайте объект Servo для сервомотора
 Servo servoZ;
@@ -131,4 +134,3 @@ void loop() {
   stepperX.run();
   stepperY.run();
 }
-
