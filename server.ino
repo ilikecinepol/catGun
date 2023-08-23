@@ -1,136 +1,106 @@
-#include <SPI.h>
-#include <WiFiEsp.h>
-#include <WiFiEspServer.h>
-#include <WiFiEspClient.h>
+#include <ESP8266WiFi.h>
 #include <Servo.h>
-#include <AccelStepper.h>
 
 // Укажите настройки Wi-Fi
-char ssid[] = "Robot";
-char pass[] = "93qp799qP";
+const char* ssid = "Robot";
+const char* password = "93qp799qP";
 
-// Укажите пины для шаговых двигателей NEMA17
-#define X_STEP_PIN 16
-#define X_DIR_PIN 14
-#define Y_STEP_PIN 4
-#define Y_DIR_PIN 13
+// Пины для шаговых двигателей
+const int xStepPin = 16;
+const int xDirPin = 14;
+const int yStepPin = 4;
+const int yDirPin = 13;
 
-// Укажите пин для сервомотора
-#define SERVO_PIN 5
+// Пины для сервомотора
+const int servoPin = 5;
 
-// Создаем объекты шаговых двигателей
-AccelStepper stepperX(AccelStepper::DRIVER, X_STEP_PIN, X_DIR_PIN);
-AccelStepper stepperY(AccelStepper::DRIVER, Y_STEP_PIN, Y_DIR_PIN);
-
-// Создайте объект Servo для сервомотора
+// Создаем объекты Servo
 Servo servoZ;
 
-// Создайте веб-сервер на порту 80
-WiFiEspServer server(80);
+// Переменные для хранения текущих состояний
+int xPosition = 0;
+int zAngle = 90;
+
+// Функция для настройки шаговых двигателей (подставьте свои значения)
+void setupSteppers() {
+  // Настройка пинов
+  pinMode(xStepPin, OUTPUT);
+  pinMode(xDirPin, OUTPUT);
+  pinMode(yStepPin, OUTPUT);
+  pinMode(yDirPin, OUTPUT);
+}
+
+// Функция для управления шаговым двигателем X
+void moveX(int steps, int dir) {
+  digitalWrite(xDirPin, dir);
+  for (int i = 0; i < steps; i++) {
+    digitalWrite(xStepPin, HIGH);
+    delayMicroseconds(500);
+    digitalWrite(xStepPin, LOW);
+    delayMicroseconds(500);
+  }
+}
+
+// Функция для управления сервомотором Z
+void rotateZ(int angle) {
+  angle = constrain(angle, 0, 180);
+  servoZ.write(angle);
+}
 
 void setup() {
+  // Инициализация Serial
   Serial.begin(115200);
 
-  // Подключение к Wi-Fi
-  WiFi.init(&Serial);
-  if (WiFi.begin(ssid, pass) != WL_CONNECTED) {
-    Serial.println("Ошибка подключения к Wi-Fi");
-    while (true);
+  // Инициализация Wi-Fi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
   }
+  Serial.println("Connected to WiFi");
 
   // Настройка шаговых двигателей
-  stepperX.setMaxSpeed(1000);
-  stepperX.setAcceleration(500);
-  stepperY.setMaxSpeed(1000);
-  stepperY.setAcceleration(500);
+  setupSteppers();
 
-  // Настройка сервомотора
-  servoZ.attach(14);
+  // Подключение сервомотора
+  servoZ.attach(servoPin);
+  servoZ.write(zAngle);
 
-  // Начальная позиция двигателей
-  stepperX.setCurrentPosition(0);
-  stepperY.setCurrentPosition(0);
-
-  // Начало прослушивания порта
-  server.begin();
+  // Запуск сервера
+  Serial.println("Server started");
 }
 
 void loop() {
-  WiFiEspClient client = server.available();
-
-  if (client) {
-    Serial.println("Новый клиент подключен");
-    String request = "";
-
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        request += c;
-
-        if (request.endsWith("\r\n\r\n")) {
-          // Отправка HTML-страницы с элементами управления
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println("Connection: close");
-          client.println();
-
-          client.println("<html>");
-          client.println("<head>");
-          client.println("<title>Управление пушкой</title>");
-          client.println("<script>");
-          client.println("function setXPosition() {");
-          client.println("var xPosition = document.getElementById('xSlider').value;");
-          client.println("var xhr = new XMLHttpRequest();");
-          client.println("xhr.open('GET', '/setX?pos=' + xPosition, true);");
-          client.println("xhr.send();");
-          client.println("}");
-
-          client.println("function shoot() {");
-          client.println("var xhr = new XMLHttpRequest();");
-          client.println("xhr.open('GET', '/shoot', true);");
-          client.println("xhr.send();");
-          client.println("}");
-
-          client.println("function setZAngle() {");
-          client.println("var zAngle = document.getElementById('zSlider').value;");
-          client.println("var xhr = new XMLHttpRequest();");
-          client.println("xhr.open('GET', '/setZ?angle=' + zAngle, true);");
-          client.println("xhr.send();");
-          client.println("}");
-          client.println("</script>");
-          client.println("</head>");
-          client.println("<body>");
-          client.println("<h1>Управление пушкой</h1>");
-
-          // Слайдеры и кнопки для управления
-          client.println("<h2>Управление наклоном по X</h2>");
-          client.println("<input type='range' min='-100' max='100' value='0' id='xSlider'>");
-          client.println("<button onclick='setXPosition()'>Установить</button>");
-          client.println("<br><br>");
-
-          client.println("<h2>Выстрел</h2>");
-          client.println("<button onclick='shoot()'>Выстрелить</button>");
-          client.println("<br><br>");
-
-          client.println("<h2>Управление поворотом Z</h2>");
-          client.println("<input type='range' min='0' max='180' value='90' id='zSlider'>");
-          client.println("<button onclick='setZAngle()'>Установить</button>");
-          client.println("<br><br>");
-
-          client.println("</body>");
-          client.println("</html>");
-
-          break;
-        }
-      }
-    }
-
-    delay(10);
-    client.stop();
-    Serial.println("Клиент отключен");
+  // Ждем подключения клиента
+  WiFiClient client = server.available();
+  if (!client) {
+    return;
   }
 
-  // Обновление двигателей
-  stepperX.run();
-  stepperY.run();
+  // Отправляем HTML-страницу клиенту
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
+  client.println();
+  client.println("<!DOCTYPE html>");
+  client.println("<html>");
+  client.println("<head><title>Gun Control</title></head>");
+  client.println("<body>");
+  client.println("<h1>Gun Control</h1>");
+  client.println("<h2>X Position:</h2>");
+  client.println("<input type='range' min='-100' max='100' value='" + String(xPosition) + "' step='10' onchange='setXPosition(this.value)'>");
+  client.println("<h2>Z Angle:</h2>");
+  client.println("<input type='range' min='0' max='180' value='" + String(zAngle) + "' step='10' onchange='setZAngle(this.value)'>");
+  client.println("<script>");
+  client.println("function setXPosition(value) {");
+  client.println("  var xhr = new XMLHttpRequest();");
+  client.println("  xhr.open('GET', '/x?pos=' + value, true);");
+  client.println("  xhr.send();");
+  client.println("}");
+  client.println("function setZAngle(value) {");
+  client.println("  var xhr = new XMLHttpRequest();");
+  client.println("  xhr.open('GET', '/z?angle=' + value, true);");
+  client.println("  xhr.send();");
+  client.println("}");
+  client.println("</script>");
+  client.println("</body></html>");
 }
