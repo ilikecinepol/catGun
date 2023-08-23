@@ -1,78 +1,39 @@
-#include <ESP8266WiFi.h>
-#include <ESPAsyncWebServer.h>
-#include <AccelStepper.h>
+#include <SPI.h>
+#include <WiFiEsp.h>
+#include <WiFiEspServer.h>
+#include <WiFiEspClient.h>
 #include <Servo.h>
+#include <AccelStepper.h>
 
-// Укажите ваши параметры Wi-Fi
-const char* ssid = "Ваш_SSID";
-const char* password = "Ваш_пароль";
+// Укажите настройки Wi-Fi
+char ssid[] = "Robot";
+char pass[] = "93qp799qP";
 
 // Укажите пины для шаговых двигателей NEMA17
-#define X_STEP_PIN 5
-#define X_DIR_PIN 4
-#define Y_STEP_PIN 2
-#define Y_DIR_PIN 0
+#define X_STEP_PIN 16
+#define X_DIR_PIN 14
+#define Y_STEP_PIN 4
+#define Y_DIR_PIN 13
 
 // Укажите пин для сервомотора
-#define SERVO_PIN 14
+#define SERVO_PIN 5
 
-// Создаем объекты шаговых двигателей
-AccelStepper stepperX(AccelStepper::DRIVER, X_STEP_PIN, X_DIR_PIN);
-AccelStepper stepperY(AccelStepper::DRIVER, Y_STEP_PIN, Y_DIR_PIN);
 
-// Создаем объект сервомотора
+// Создайте объект Servo для сервомотора
 Servo servoZ;
 
-// Создаем веб-сервер на порту 80
-AsyncWebServer server(80);
-
-// HTML-страница для управления пушкой
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Управление пушкой</title>
-  <script>
-    function setXPosition() {
-      var xPosition = document.getElementById("xPosition").value;
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", "/setX?pos=" + xPosition, true);
-      xhr.send();
-    }
-
-    function shoot() {
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", "/shoot", true);
-      xhr.send();
-    }
-
-    function setZAngle() {
-      var zAngle = document.getElementById("zAngle").value;
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", "/setZ?angle=" + zAngle, true);
-      xhr.send();
-    }
-  </script>
-</head>
-<body>
-  <h1>Управление пушкой</h1>
-  <h2>Наклон пушки по оси X</h2>
-  <input type="number" id="xPosition" placeholder="Позиция X">
-  <button onclick="setXPosition()">Установить</button>
-
-  <h2>Выстрел</h2>
-  <button onclick="shoot()">Выстрелить</button>
-
-  <h2>Поворот вокруг оси Z</h2>
-  <input type="number" id="zAngle" placeholder="Угол Z">
-  <button onclick="setZAngle()">Установить</button>
-</body>
-</html>
-)rawliteral";
+// Создайте веб-сервер на порту 80
+WiFiEspServer server(80);
 
 void setup() {
-  // Инициализация серво
-  servoZ.attach(SERVO_PIN);
+  Serial.begin(115200);
+
+  // Подключение к Wi-Fi
+  WiFi.init(&Serial);
+  if (WiFi.begin(ssid, pass) != WL_CONNECTED) {
+    Serial.println("Ошибка подключения к Wi-Fi");
+    while (true);
+  }
 
   // Настройка шаговых двигателей
   stepperX.setMaxSpeed(1000);
@@ -80,45 +41,94 @@ void setup() {
   stepperY.setMaxSpeed(1000);
   stepperY.setAcceleration(500);
 
-  // Подключение к Wi-Fi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.println("Connecting to WiFi...");
-  }
-  Serial.println("Connected to WiFi");
+  // Настройка сервомотора
+  servoZ.attach(14);
 
-  // Обработчики для веб-интерфейса
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/html", index_html);
-  });
+  // Начальная позиция двигателей
+  stepperX.setCurrentPosition(0);
+  stepperY.setCurrentPosition(0);
 
-  server.on("/setX", HTTP_GET, [](AsyncWebServerRequest *request){
-    String posX = request->arg("pos");
-    int targetX = posX.toInt();
-    stepperX.moveTo(targetX);
-    request->send(200, "text/plain", "OK");
-  });
-
-  server.on("/shoot", HTTP_GET, [](AsyncWebServerRequest *request){
-    // Логика для выстрела
-    // ...
-    request->send(200, "text/plain", "OK");
-  });
-
-  server.on("/setZ", HTTP_GET, [](AsyncWebServerRequest *request){
-    String angle = request->arg("angle");
-    int targetAngle = angle.toInt();
-    servoZ.write(targetAngle);
-    request->send(200, "text/plain", "OK");
-  });
-
-  // Запуск веб-сервера
+  // Начало прослушивания порта
   server.begin();
 }
 
 void loop() {
-  // Обновление шаговых двигателей
+  WiFiEspClient client = server.available();
+
+  if (client) {
+    Serial.println("Новый клиент подключен");
+    String request = "";
+
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+        request += c;
+
+        if (request.endsWith("\r\n\r\n")) {
+          // Отправка HTML-страницы с элементами управления
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println("Connection: close");
+          client.println();
+
+          client.println("<html>");
+          client.println("<head>");
+          client.println("<title>Управление пушкой</title>");
+          client.println("<script>");
+          client.println("function setXPosition() {");
+          client.println("var xPosition = document.getElementById('xSlider').value;");
+          client.println("var xhr = new XMLHttpRequest();");
+          client.println("xhr.open('GET', '/setX?pos=' + xPosition, true);");
+          client.println("xhr.send();");
+          client.println("}");
+
+          client.println("function shoot() {");
+          client.println("var xhr = new XMLHttpRequest();");
+          client.println("xhr.open('GET', '/shoot', true);");
+          client.println("xhr.send();");
+          client.println("}");
+
+          client.println("function setZAngle() {");
+          client.println("var zAngle = document.getElementById('zSlider').value;");
+          client.println("var xhr = new XMLHttpRequest();");
+          client.println("xhr.open('GET', '/setZ?angle=' + zAngle, true);");
+          client.println("xhr.send();");
+          client.println("}");
+          client.println("</script>");
+          client.println("</head>");
+          client.println("<body>");
+          client.println("<h1>Управление пушкой</h1>");
+
+          // Слайдеры и кнопки для управления
+          client.println("<h2>Управление наклоном по X</h2>");
+          client.println("<input type='range' min='-100' max='100' value='0' id='xSlider'>");
+          client.println("<button onclick='setXPosition()'>Установить</button>");
+          client.println("<br><br>");
+
+          client.println("<h2>Выстрел</h2>");
+          client.println("<button onclick='shoot()'>Выстрелить</button>");
+          client.println("<br><br>");
+
+          client.println("<h2>Управление поворотом Z</h2>");
+          client.println("<input type='range' min='0' max='180' value='90' id='zSlider'>");
+          client.println("<button onclick='setZAngle()'>Установить</button>");
+          client.println("<br><br>");
+
+          client.println("</body>");
+          client.println("</html>");
+
+          break;
+        }
+      }
+    }
+
+    delay(10);
+    client.stop();
+    Serial.println("Клиент отключен");
+  }
+
+  // Обновление двигателей
   stepperX.run();
   stepperY.run();
 }
+
