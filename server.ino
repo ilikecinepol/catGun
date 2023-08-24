@@ -13,6 +13,7 @@ const int yDirPin = 13;
 
 // Пины для сервомотора
 const int servoPin = 5;
+int pose;
 
 // Создаем объекты Servo
 Servo servoZ;
@@ -52,6 +53,33 @@ void setup() {
   Serial.println("Server started");
 }
 
+// Функция для управления шаговым двигателем X
+void moveX(int newPos) {
+ if (newPos > pose){
+   digitalWrite(xDirPin, 0); // set direction, HIGH for clockwise, LOW for anticlockwise
+  }
+  else{
+    digitalWrite(xDirPin, 1); // set direction, HIGH for clockwise, LOW for anticlockwise
+  }
+ for(int x = 0; x<10; x++){ 
+  digitalWrite(xStepPin,HIGH);
+  delayMicroseconds(1000);
+  digitalWrite(xStepPin,LOW); 
+  delayMicroseconds(1000);
+
+}
+}
+
+// Функция для управления сервомотором Z
+void rotateZ(int newAngle) {
+  Serial.println(newAngle);
+
+  //newAngle = constrain(newAngle, 0, 180);
+  servoZ.write(newAngle);
+  //zAngle = newAngle;
+}
+
+
 void loop() {
   // Ожидание клиента
   WiFiClient client = server.available();
@@ -81,7 +109,7 @@ void loop() {
   client.println("<h2>X Position:</h2>");
   client.println("<input type='range' min='-100' max='100' value='" + String(xPosition) + "' step='10' onchange='setXPosition(this.value)'>");
   client.println("<h2>Z Angle:</h2>");
-  client.println("<input type='range' min='0' max='180' value='" + String(zAngle) + "' step='10' onchange='setZAngle(this.value)'>");
+  client.println("<input type='range' min='0' max='180' value='" + String(zAngle) + "'  oninput='setZAngle(this.value)'>");
   client.println("<script>");
   client.println("function setXPosition(value) {");
   client.println("  var xhr = new XMLHttpRequest();");
@@ -97,23 +125,5 @@ void loop() {
   client.println("</body></html>");
 
   delay(10);
-  client.stop();
-}
-
-// Функция для управления шаговым двигателем X
-void moveX(int newPos) {
-  digitalWrite(xDirPin, 0); // set direction, HIGH for clockwise, LOW for anticlockwise
- 
- while(digitalRead(13) == HIGH) { 
-  digitalWrite(xStepPin,HIGH);
-  delayMicroseconds(1000);
-  digitalWrite(xStepPin,LOW); 
-  delayMicroseconds(1000);
- }
-delay(100); // delay for 1 second
-}
-
-// Функция для управления сервомотором Z
-void rotateZ(int newAngle) {
-  // Ваш код для управления сервомотором Z
+  //client.stop();
 }
