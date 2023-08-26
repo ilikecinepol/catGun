@@ -9,11 +9,12 @@ const char* password = "93qp799qP";
 const int xStepPin = 16;
 const int xDirPin = 14;
 const int yStepPin = 4;
-const int yDirPin = 12;
-const int ledPin = 5;
+const int yDirPin = 13;
+const int ledPin = 12;
 
 // Пины для сервомотора
 const int servoPin = 5;
+int pose;
 
 // Создаем объекты Servo
 Servo servoZ;
@@ -42,6 +43,8 @@ void setup() {
   pinMode(xDirPin, OUTPUT);
   pinMode(yStepPin, OUTPUT);
   pinMode(yDirPin, OUTPUT);
+  pinMode(ledPin, OUTPUT);
+  
 
   // Подключение сервомотора
   servoZ.attach(servoPin);
@@ -55,27 +58,30 @@ void setup() {
 
 // Функция для управления шаговым двигателем X
 void moveX(int newPos) {
-  int stepsToMove = newPos - xPosition;
-  int dir = (stepsToMove > 0) ? HIGH : LOW;
-  stepsToMove = abs(stepsToMove);
-
-  digitalWrite(xDirPin, dir);
-  for (int i = 0; i < stepsToMove; i++) {
-    digitalWrite(xStepPin, HIGH);
-    delayMicroseconds(500);
-    digitalWrite(xStepPin, LOW);
-    delayMicroseconds(500);
+ if (newPos > pose){
+   digitalWrite(xDirPin, 0); // set direction, HIGH for clockwise, LOW for anticlockwise
   }
+  else{
+    digitalWrite(xDirPin, 1); // set direction, HIGH for clockwise, LOW for anticlockwise
+  }
+ for(int x = 0; x<10; x++){ 
+  digitalWrite(xStepPin,HIGH);
+  delayMicroseconds(1000);
+  digitalWrite(xStepPin,LOW); 
+  delayMicroseconds(1000);
 
-  xPosition = newPos;
+}
 }
 
 // Функция для управления сервомотором Z
 void rotateZ(int newAngle) {
-  newAngle = constrain(newAngle, 0, 180);
+  Serial.println(newAngle);
+  newAngle = map(newAngle, 0, 180, 180, 0);
   servoZ.write(newAngle);
   zAngle = newAngle;
+  delay(10);
 }
+
 
 void loop() {
   // Ожидание клиента
@@ -92,10 +98,11 @@ void loop() {
   } else if (request.indexOf("/z") != -1) {
     int newAngle = request.substring(request.indexOf("angle=") + 6).toInt();
     rotateZ(newAngle);
-  
   } else if (request.indexOf("/ledon") != -1) {
+    Serial.println("LED ON");
     digitalWrite(ledPin, HIGH);
   } else if (request.indexOf("/ledoff") != -1) {
+    Serial.println("LED OFF");
     digitalWrite(ledPin, LOW);
   }
 
@@ -105,13 +112,19 @@ void loop() {
   client.println();
   client.println("<!DOCTYPE html>");
   client.println("<html>");
-  client.println("<head><title>Gun Control</title></head>");
+  client.println("<head>");
+  client.println("<meta charset='utf-8'>");
+  client.println("<title>Управление пушкой</title>");
+  client.println("</head>");
   client.println("<body>");
-  client.println("<h1>Gun Control</h1>");
+  client.println("<h1>Панель управления пушкой</h1>");
   client.println("<h2>X Position:</h2>");
   client.println("<input type='range' min='-100' max='100' value='" + String(xPosition) + "' step='10' onchange='setXPosition(this.value)'>");
-  client.println("<h2>Z Angle:</h2>");
-  client.println("<input type='range' min='0' max='180' value='" + String(zAngle) + "' step='10' onchange='setZAngle(this.value)'>");
+  client.println("<h2>Горизонтальное наведение:</h2>");
+  client.println("<input type='range' min='0' max='180' value='" + String(zAngle) + "'  onchange='setZAngle(this.value)'>");
+  client.println("<h2>Управление светодиодом</h2>");
+  client.println("<button onclick='turnOnLED()'>Включить светодиод</button>");
+  client.println("<button onclick='turnOffLED()'>Выключить светодиод</button>");
   client.println("<script>");
   client.println("function setXPosition(value) {");
   client.println("  var xhr = new XMLHttpRequest();");
@@ -123,10 +136,6 @@ void loop() {
   client.println("  xhr.open('GET', '/z?angle=' + value, true);");
   client.println("  xhr.send();");
   client.println("}");
-  client.println("<h2>Управление светодиодом</h2>");
-  client.println("<button onclick='turnOnLED()'>Включить светодиод</button>");
-  client.println("<button onclick='turnOffLED()'>Выключить светодиод</button>");
-  client.println("<script>");
   client.println("function turnOnLED() {");
   client.println("  var xhr = new XMLHttpRequest();");
   client.println("  xhr.open('GET', '/ledon', true);");
@@ -138,12 +147,8 @@ void loop() {
   client.println("  xhr.send();");
   client.println("}");
   client.println("</script>");
-  client.println("</script>");
   client.println("</body></html>");
 
   delay(10);
-  client.stop();
+  //client.stop();
 }
-
-
-
