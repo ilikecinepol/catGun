@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Bluetooth Gamepad</title>
+    <style>
+        body {
+            text-align: center;
+        }
+
+        #gamepad-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #gamepad {
+            width: 400px;
+            height: 200px;
+            background-color: #f0f0f0;
+            border: 2px solid #000;
+            position: relative;
+            margin: 20px auto;
+        }
+
+        .direction-button {
+            width: 40px;
+            height: 40px;
+            background-color: #0078d4;
+            border: 2px solid #000;
+            border-radius: 50%;
+            position: absolute;
+            cursor: pointer;
+            text-align: center;
+            line-height: 40px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        #button-up {
+            top: 20px;
+            left: 100px;
+        }
+
+        #button-down {
+            bottom: 20px;
+            left: 100px;
+        }
+
+        #button-left {
+            top: 80px;
+            left: 60px;
+        }
+
+        #button-right {
+            top: 80px;
+            left: 140px;
+        }
+
+        .function-button {
+            width: 40px;
+            height: 40px;
+            background-color: #ff5733;
+            border: 2px solid #000;
+            border-radius: 50%;
+            position: absolute;
+            cursor: pointer;
+            text-align: center;
+            line-height: 40px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        #button-a {
+            top: 80px;
+            left: 320px;
+            background-color: gray;
+        }
+
+        #button-b {
+            top: 20px;
+            left: 320px;
+            background-color: gray;
+        }
+
+        #button-x {
+            top: 20px;
+            left: 240px;
+            background-color: gray;
+        }
+
+        #button-y {
+            top: 80px;
+            left: 240px;
+            background-color: gray;
+        }
+
+        #device-selector {
+            width: 200px;
+            margin: 20px auto;
+        }
+        /* Добавляем стили для кнопок при нажатии */
+        .direction-button:active,
+        .function-button:active {
+        background-color: #ff5733; /* Изменяем цвет при нажатии */
+        transform: scale(0.9); /* Уменьшаем размер кнопки */
+}
+    </style>
+</head>
+<body>
+    <div id="gamepad-container">
+        <div id="gamepad">
+            <div id="button-up" class="direction-button" onclick="handleButtonClick('↑')">↑</div>
+            <div id="button-down" class="direction-button" onclick="handleButtonClick('↓')">↓</div>
+            <div id="button-left" class="direction-button" onclick="handleButtonClick('←')">←</div>
+            <div id="button-right" class="direction-button" onclick="handleButtonClick('→')">→</div>
+            <div id="button-a" class="function-button" onclick="handleButtonClick('A')">🐱</div>
+            <div id="button-b" class="function-button" onclick="handleButtonClick('B')">😽</div>
+            <div id="button-x" class="function-button" onclick="handleButtonClick('X')">🙀</div>
+            <div id="button-y" class="function-button" onclick="handleButtonClick('Y')">😾</div>
+
+        </div>
+        <select id="device-selector">
+            {% for address, name in device_dict.items() %}
+                <option value="{{ address }}">{{ name }}</option>
+            {% endfor %}
+        </select>
+        <!-- Элемент для отображения имени выбранного устройства -->
+        <p id="selected-device-name">Selected Device: None</p>
+        <p id="connection-status">connection-status: None</p>
+        <button id="connect-button" onchange="displaySelectedValue()">Connect</button>
+        <p id="result">Выбранное значение: </p>
+        <!-- JavaScript-код -->
+        <script>
+            function handleButtonClick(buttonName) {
+                // Отправляем информацию о нажатой кнопке на сервер
+                fetch('/button_click', {
+                    method: 'POST',
+                    body: 'button_name=' + buttonName,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                }).then(response => {
+                    // Обработка ответа от сервера (если это необходимо)
+                }).catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+            // Ваш JavaScript-код для заполнения выпадающего списка
+            var deviceSelector = document.getElementById("device-selector");
+            var deviceDict = {
+                "device1": "Устройство 1",
+                "device2": "Устройство 2",
+                // Другие устройства из вашего словаря
+            };
+
+            for (var address in deviceDict) {
+                if (deviceDict.hasOwnProperty(address)) {
+                    var deviceName = deviceDict[address];
+                    var option = document.createElement("option");
+                    option.value = address;
+                    option.text = deviceName;
+                    deviceSelector.appendChild(option);
+                }
+            }
+            document.getElementById('connect-button').addEventListener('click', async () => {
+                const selectedDevice = document.getElementById('device-selector').value;
+
+                // Обновляем элемент для отображения имени выбранного устройства
+                const selectedDeviceName = document.getElementById('selected-device-name');
+                selectedDeviceName.textContent = `Selected Device: ${selectedDevice}`;
+
+                const response = await fetch(`/connect?device=${selectedDevice}`);
+                if (response.ok) {
+                    document.getElementById('connection-status').textContent = 'Connected';
+
+                    // Теперь отправляем запрос на получение информации об устройстве
+                    const deviceInfoResponse = await fetch(`/device_info?device=${selectedDevice}`);
+                    if (deviceInfoResponse.ok) {
+                        document.getElementById('connection-status').textContent = 'Connection Success';
+                    }
+                } else {
+                    document.getElementById('connection-status').textContent = 'Connection Failed';
+                }
+            });
+            function displaySelectedValue() {
+                // Получаем элемент выбора
+                var selectBox = document.getElementById("device-selector");
+
+                // Получаем выбранное значение
+                var selectedValue = selectBox.options[selectBox.selectedIndex].value;
+
+                // Отображаем выбранное значение на странице
+                var resultElement = document.getElementById("result");
+                resultElement.textContent = "Выбранное значение: " + selectedValue;
+            }
+
+        </script>
+
+    </div>
+
+</body>
+</html>
